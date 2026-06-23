@@ -1,0 +1,206 @@
+/* ============================================
+   月抛模拟器 - 自定义样式
+   Tailwind CSS 通过 CDN 加载
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+
+body {
+    font-family: 'Noto Sans SC', sans-serif;
+    background-color: #020617;
+    color: #cbd5e1;
+    overflow-x: hidden;
+    user-select: none;
+}
+
+/* Glassmorphism UI */
+.glass-panel {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+
+.tag-badge {
+    transition: all 0.3s ease;
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
+}
+
+.tag-reveal {
+    animation: flipIn 0.6s ease;
+}
+
+@keyframes popIn {
+    from { opacity: 0; transform: scale(0.8) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes flipIn {
+    0% { transform: rotateX(90deg); opacity: 0; }
+    100% { transform: rotateX(0deg); opacity: 1; }
+}
+
+@keyframes pulse-stress {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+    50% { box-shadow: 0 0 15px 2px rgba(124, 58, 237, 0.3); }
+}
+
+@keyframes panic-shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+.stress-pulse { animation: pulse-stress 3s infinite; }
+.panic-mode { animation: panic-shake 0.5s infinite; filter: blur(0.5px) contrast(1.2); }
+.blur-text { color: transparent; text-shadow: 0 0 8px rgba(255,255,255,0.7); }
+
+/* ============================================
+   Button States
+   ============================================ */
+
+.btn-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(100%);
+    position: relative;
+}
+.btn-disabled::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 10%; right: 10%; height: 2px;
+    background: rgba(255,255,255,0.4);
+    transform: rotate(-3deg);
+}
+
+/* ============================================
+   Avatar Float
+   ============================================ */
+
+.avatar-float { animation: float 6s ease-in-out infinite; }
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+}
+
+/* ============================================
+   Custom Scrollbar
+   ============================================ */
+
+.custom-scroll::-webkit-scrollbar { width: 4px; }
+.custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+.custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+/* ============================================
+   Disease Education Accordion
+   ============================================ */
+
+.edu-accordion {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+    background: rgba(15, 23, 42, 0.6);
+}
+
+.edu-accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    user-select: none;
+}
+
+.edu-accordion-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.edu-accordion-header .arrow {
+    transition: transform 0.3s ease;
+    font-size: 0.75rem;
+    opacity: 0.5;
+}
+
+.edu-accordion.open .edu-accordion-header .arrow {
+    transform: rotate(180deg);
+}
+
+.edu-accordion-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, padding 0.4s ease;
+}
+
+.edu-accordion.open .edu-accordion-body {
+    max-height: 2000px;
+}
+
+.edu-accordion-content {
+    padding: 1rem 1rem 1rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: #cbd5e1;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.edu-reference {
+    display: inline-block;
+    margin-top: 0.25rem;
+    font-size: 0.7rem;
+    color: #7dd3fc;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: color 0.2s;
+}
+
+.edu-reference:hover {
+    color: #38bdf8;
+}
+
+.edu-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.edu-badge-danger  { background: rgba(239,68,68,0.2);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+.edu-badge-warn   { background: rgba(245,158,11,0.2); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+.edu-badge-info   { background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
+.edu-badge-safe   { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+
+/* ============================================
+   Responsive: Desktop (lg+)
+   ============================================ */
+
+@media (min-width: 1024px) {
+    .edu-accordion-content {
+        font-size: 0.9rem;
+        line-height: 1.8;
+    }
+
+    .edu-accordion-header {
+        padding: 1rem 1.25rem;
+    }
+
+    .edu-accordion-content {
+        padding: 1rem 1.25rem 1.25rem 1.25rem;
+    }
+}

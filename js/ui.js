@@ -1,0 +1,671 @@
+/* ============================================
+   ui.js - UI 渲染与交互
+   统计条、伴侣渲染、弹窗、历史记录、疾病科普
+   ============================================ */
+
+// ==========================================
+// 统计条更新
+// ==========================================
+
+function updateStatsUI() {
+    const fBar = document.getElementById('frustration-bar');
+    fBar.style.width = `${STATE.frustration}%`;
+    document.getElementById('frustration-val').innerText = `${STATE.frustration}%`;
+
+    const aBar = document.getElementById('anxiety-bar');
+    aBar.style.width = `${STATE.anxiety}%`;
+    document.getElementById('anxiety-val').innerText = `${STATE.anxiety}%`;
+
+    const gameContent = document.getElementById('game-content');
+    const panicWarn = document.getElementById('panic-warning');
+
+    if (STATE.anxiety >= 80) {
+        gameContent.classList.add('panic-mode');
+        panicWarn.classList.remove('hidden');
+        aBar.classList.add('bg-violet-500');
+        aBar.classList.remove('bg-gradient-to-r');
+    } else {
+        gameContent.classList.remove('panic-mode');
+        panicWarn.classList.add('hidden');
+        aBar.classList.remove('bg-violet-500');
+        aBar.classList.add('bg-gradient-to-r');
+    }
+
+    document.getElementById('turn-count').innerText = STATE.turn.toString().padStart(2, '0');
+    document.getElementById('item-testkit').innerText = `x${STATE.items.testkit}`;
+    if (STATE.items.testkit === 0) {
+        document.getElementById('item-testkit').className = "text-xs font-bold text-slate-600";
+    } else {
+        document.getElementById('item-testkit').className = "text-xs font-bold text-sky-400";
+    }
+}
+
+// ==========================================
+// 伴侣渲染
+// ==========================================
+
+function renderPartner() {
+    const p = STATE.currentPartner;
+    document.getElementById('avatar-emoji').innerText = p.avatar;
+    // 仅在新伴侣（未检测过）时隐藏警告；试纸阳性后保持显示
+    if (!p._statusShown) {
+        document.getElementById('partner-status').classList.add('hidden');
+    }
+    document.getElementById('flirt-text').innerText = `"${FLIRT_LINES[Math.floor(Math.random() * FLIRT_LINES.length)]}"`;
+
+    const container = document.getElementById('tags-container');
+    container.innerHTML = '';
+
+    let constraints = [];
+    let hiddenCount = 0;
+    const isPanic = STATE.anxiety >= 80;
+
+    p.tags.forEach((tag) => {
+        const div = document.createElement('div');
+        const forceHide = isPanic && Math.random() < 0.5;
+        if (!tag.revealed || forceHide) {
+            hiddenCount++;
+            div.className = `tag-badge px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 bg-slate-900 border border-slate-700 shadow-sm mb-1 flex items-center gap-1.5 cursor-help`;
+            div.innerHTML = isPanic ? `<span class="blur-sm">???</span>` : `<span>❓</span> 隐藏信息`;
+        } else {
+            if (tag.constraint) constraints.push(tag.constraint);
+            div.className = `tag-badge tag-reveal px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow-lg mb-1 flex items-center gap-1.5 border border-white/10 ${tag.color}`;
+            let icon = '⏺';
+            if (tag.color.includes('red')) icon = '⚠️';
+            else if (tag.constraint) icon = '🚫';
+            else if (tag.color.includes('emerald')) icon = '🛡️';
+            div.innerHTML = `<span class="opacity-75">${icon}</span> ${tag.text}`;
+        }
+        container.appendChild(div);
+    });
+
+    resetButtons();
+
+    // ---- 动态计算压力倍率（体征缩放 + 试纸清零） ----
+    const visibleSigns = p.tags.filter(function(t) {
+        if (!t.revealed) return false;
+        var c = t.color || '';
+        return c.indexOf('red') !== -1 || c.indexOf('purple') !== -1;
+    }).length;
+
+    var signMult = 1;
+    if (visibleSigns > 0) {
+        signMult = Math.min(1 + visibleSigns * CONFIG.ANXIETY_SIGN.perSignMultiplier, CONFIG.ANXIETY_SIGN.maxMultiplier);
+    }
+    var tested = p.testedNegative;
+
+    // ---- 更新四个性行为按钮标签 ----
+    var actionDefs = [
+        { id: 'btn-oral-condom', emoji: '🍬', name: '戴套口交', action: 'oral_condom' },
+        { id: 'btn-sex-condom',  emoji: '🛡️', name: '戴套性交', action: 'sex_condom' },
+        { id: 'btn-oral-raw',    emoji: '🍭', name: '无套口交', action: 'oral_raw' },
+        { id: 'btn-sex-raw',     emoji: '🔥', name: '无套性交', action: 'sex_raw' }
+    ];
+
+    for (var i = 0; i < actionDefs.length; i++) {
+        var def = actionDefs[i];
+        var btn = document.getElementById(def.id);
+        if (!btn) continue;
+
+        var reward = CONFIG.rewards[def.action];
+        var stress = CONFIG.stress[def.action];
+        var rewardRange = reward.min + '~' + reward.max;
+        var stressRange;
+        if (tested) {
+            stressRange = '0';
+        } else if (signMult > 1) {
+            stressRange = Math.round(stress.min * signMult) + '~' + Math.round(stress.max * signMult);
+        } else {
+            stressRange = stress.min + '~' + stress.max;
+        }
+
+        btn.innerHTML = def.emoji + ' ' + def.name +
+            '<span class="block text-[9px] opacity-60 mt-0.5">收益 ' + rewardRange + ' | 压力 +' + stressRange + '</span>';
+    }
+
+    // ---- 换一个按钮 ----
+    var refuseBtn = document.getElementById('btn-refuse');
+    if (refuseBtn) {
+        var pg = CONFIG.passiveGain;
+        refuseBtn.innerHTML = '<span>👋</span> 换一个 (压抑值+' + pg.min + '~' + pg.max + ')';
+    }
+
+    // ---- 聊天按钮 ----
+    var chatBtn = document.getElementById('btn-chat');
+    var chatRange = CONFIG.chatCost.min + '~' + CONFIG.chatCost.max;
+    if (hiddenCount === 0 && !isPanic) {
+        chatBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        chatBtn.disabled = true;
+        chatBtn.innerHTML = '<span>💬</span> 已完全了解';
+    } else {
+        chatBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        chatBtn.disabled = false;
+        chatBtn.innerHTML = '<span>💬</span> 试探 / 聊天 <span class="opacity-50 text-[10px] font-normal ml-1">(压抑值+' + chatRange + ')</span>';
+    }
+
+    if (constraints.length > 0) applyConstraints(constraints);
+}
+
+// ==========================================
+// 按钮状态管理
+// ==========================================
+
+function resetButtons() {
+    const ids = ['btn-oral-condom', 'btn-oral-raw', 'btn-sex-condom', 'btn-sex-raw'];
+    ids.forEach(id => {
+        const btn = document.getElementById(id);
+        btn.disabled = false;
+        btn.classList.remove('btn-disabled');
+        const overlay = btn.querySelector('.disabled-overlay');
+        if (overlay) overlay.remove();
+    });
+}
+
+function applyConstraints(constraints) {
+    constraints.forEach(c => {
+        if (c === 'no_condom') {
+            disableBtn('btn-oral-condom');
+            disableBtn('btn-sex-condom');
+        } else if (c === 'condom_only') {
+            disableBtn('btn-oral-raw');
+            disableBtn('btn-sex-raw');
+        } else if (c === 'no_oral') {
+            disableBtn('btn-oral-condom');
+            disableBtn('btn-oral-raw');
+        } else if (c === 'oral_only') {
+            disableBtn('btn-sex-condom');
+            disableBtn('btn-sex-raw');
+        }
+    });
+}
+
+function disableBtn(id) {
+    const btn = document.getElementById(id);
+    if (!btn.disabled) {
+        btn.disabled = true;
+        btn.classList.add('btn-disabled');
+        const span = document.createElement('div');
+        span.className = 'disabled-overlay absolute inset-0 flex items-center justify-center bg-black/60 text-rose-500 font-bold rotate-[-3deg] text-[10px] uppercase border border-rose-500/30 rounded-xl backdrop-blur-[1px]';
+        span.innerText = "对方拒绝";
+        btn.appendChild(span);
+    }
+}
+
+// ==========================================
+// Modal 管理
+// ==========================================
+
+function toggleHelp() {
+    const modal = document.getElementById('help-modal');
+    modal.classList.toggle('hidden');
+}
+
+function toggleHistoryView(show) {
+    const summaryView = document.getElementById('summary-view');
+    const historyView = document.getElementById('history-view');
+
+    if (show) {
+        summaryView.classList.add('hidden');
+        historyView.classList.remove('hidden');
+    } else {
+        summaryView.classList.remove('hidden');
+        historyView.classList.add('hidden');
+    }
+}
+
+function toggleDisclaimerConsent() {
+    const consent = document.getElementById('disclaimer-consent');
+    const continueBtn = document.getElementById('continue-intro-btn');
+    continueBtn.disabled = !consent.checked;
+    continueBtn.classList.toggle('opacity-50', !consent.checked);
+    continueBtn.classList.toggle('cursor-not-allowed', !consent.checked);
+    continueBtn.classList.toggle('hover:bg-rose-500', consent.checked);
+}
+
+function enterGameIntro() {
+    const consent = document.getElementById('disclaimer-consent');
+    if (!consent.checked) return;
+    document.getElementById('compliance-modal').classList.add('hidden');
+    document.getElementById('intro-modal').classList.remove('hidden');
+    document.getElementById('intro-modal').classList.add('flex');
+}
+
+function startGame() {
+    document.getElementById('intro-modal').classList.add('hidden');
+    document.getElementById('game-container').classList.remove('hidden');
+    initGame();
+}
+
+function returnToIntro() {
+    document.getElementById('feedback-overlay').classList.add('hidden');
+    document.getElementById('game-container').classList.add('hidden');
+    document.getElementById('intro-modal').classList.remove('hidden');
+    document.getElementById('intro-modal').classList.add('flex');
+}
+
+// ==========================================
+// 历史记录列表渲染
+// ==========================================
+
+function renderHistoryList() {
+    const list = document.getElementById('history-list');
+    list.innerHTML = '';
+
+    STATE.history.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = "flex items-start gap-3 p-3 bg-slate-800/50 rounded-lg border border-white/5";
+
+        let statusIcon = item.diseases.length > 0 ? "<span class='absolute -bottom-1 -right-1 text-[10px]'>🦠</span>" : "";
+
+        let tagHTML = item.tags.map(t => `<span class='inline-block px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-300 mr-1 mb-1'>${t.text}</span>`).join("");
+        if (item.diseases.length > 0) {
+            tagHTML += `<br><span class='text-[10px] text-rose-400 font-bold'>携带: ${item.diseases.map(d => DISEASES[d].name).join(", ")}</span>`;
+        } else {
+            tagHTML += `<br><span class='text-[10px] text-emerald-500/50'>健康</span>`;
+        }
+
+        div.innerHTML = `
+            <div class="relative text-2xl bg-slate-900 rounded-full w-10 h-10 flex items-center justify-center border border-white/10 flex-shrink-0">
+                ${item.avatar} ${statusIcon}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="mb-1 leading-tight">${tagHTML}</div>
+            </div>
+            <div class="flex-shrink-0 ml-2">
+                <span class="px-2 py-1 rounded text-[10px] font-bold border ${item.outcomeClass}">${item.outcomeLabel}</span>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+// ==========================================
+// 统计信息 HTML 生成
+// ==========================================
+
+function getStatsHTML() {
+    let counts = { enjoy: 0, escape: 0, leave: 0, miss: 0, infected: 0 };
+    let actionCounts = {
+        sex_raw: 0,
+        sex_condom: 0,
+        oral_raw: 0,
+        oral_condom: 0,
+        refuse: 0
+    };
+
+    STATE.history.forEach(h => {
+        if (h.outcomeLabel.includes("理智享受")) counts.enjoy++;
+        if (h.outcomeLabel.includes("死里逃生")) counts.escape++;
+        if (h.outcomeLabel.includes("正确离开")) counts.leave++;
+        if (h.outcomeLabel.includes("遗憾错过")) counts.miss++;
+        if (h.outcomeLabel.includes("被ta感染")) counts.infected++;
+
+        if (actionCounts[h.action] !== undefined) {
+            actionCounts[h.action]++;
+        }
+    });
+
+    return `
+        <div class="mt-4 bg-slate-950/50 rounded-xl p-3 border border-white/5 text-xs">
+            <h4 class="text-slate-500 font-bold uppercase tracking-widest mb-2 text-center text-[10px]">生涯结果</h4>
+            <div class="grid grid-cols-2 gap-y-2 gap-x-4 mb-4">
+                <div class="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span class="text-blue-300">✅ 理智享受</span>
+                    <span class="font-mono font-bold text-white text-sm">${counts.enjoy}</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span class="text-emerald-300">🛡️ 正确离开</span>
+                    <span class="font-mono font-bold text-white text-sm">${counts.leave}</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span class="text-amber-300">😰 死里逃生</span>
+                    <span class="font-mono font-bold text-white text-sm">${counts.escape}</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span class="text-slate-400">👋 遗憾错过</span>
+                    <span class="font-mono font-bold text-white text-sm">${counts.miss}</span>
+                </div>
+                <div class="col-span-2 flex justify-between items-center border-b border-white/5 pb-1 bg-rose-950/20 px-1 -mx-1 rounded">
+                    <span class="text-rose-400 font-bold">💀 被感染次数</span>
+                    <span class="font-mono font-black text-rose-400 text-sm">${counts.infected}</span>
+                </div>
+            </div>
+
+            <h4 class="text-slate-500 font-bold uppercase tracking-widest mb-2 text-center text-[10px]">行为统计 (次数)</h4>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <div class="bg-rose-900/20 border border-rose-500/20 rounded p-1 text-center">
+                    <div class="text-[9px] text-rose-300 opacity-70">无套性交</div>
+                    <div class="font-mono font-bold text-rose-200">${actionCounts.sex_raw}</div>
+                </div>
+                <div class="bg-amber-900/20 border border-amber-500/20 rounded p-1 text-center">
+                    <div class="text-[9px] text-amber-300 opacity-70">无套口交</div>
+                    <div class="font-mono font-bold text-amber-200">${actionCounts.oral_raw}</div>
+                </div>
+                <div class="bg-emerald-900/20 border border-emerald-500/20 rounded p-1 text-center">
+                    <div class="text-[9px] text-emerald-300 opacity-70">戴套性交</div>
+                    <div class="font-mono font-bold text-emerald-200">${actionCounts.sex_condom}</div>
+                </div>
+                <div class="bg-slate-800/50 border border-white/10 rounded p-1 text-center">
+                    <div class="text-[9px] text-slate-400 opacity-70">戴套口交</div>
+                    <div class="font-mono font-bold text-slate-300">${actionCounts.oral_condom}</div>
+                </div>
+                <div class="col-span-2 bg-slate-800 border border-white/5 rounded p-1 flex justify-between px-3 items-center">
+                    <div class="text-[9px] text-slate-400">👋 拒绝/离开</div>
+                    <div class="font-mono font-bold text-white">${actionCounts.refuse}</div>
+                </div>
+            </div>
+
+            <div class="mt-2 pt-2 border-t border-white/10 flex justify-between items-center">
+                <span class="font-bold text-slate-300">⏱️ 存活回合</span>
+                <span class="font-mono font-black text-xl text-white">${STATE.turn - 1}</span>
+            </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// 弹窗宽度切换
+// ==========================================
+
+const FEEDBACK_PANEL = document.getElementById('feedback-panel');
+
+/** 切换结算弹窗宽度：窄（提示）/ 宽（结算+科普） */
+function setFeedbackWide(wide) {
+    if (!FEEDBACK_PANEL) return;
+    if (wide) {
+        FEEDBACK_PANEL.classList.remove('lg:max-w-lg');
+        FEEDBACK_PANEL.classList.add('lg:max-w-4xl');
+    } else {
+        FEEDBACK_PANEL.classList.add('lg:max-w-lg');
+        FEEDBACK_PANEL.classList.remove('lg:max-w-4xl');
+    }
+}
+
+// ==========================================
+// 按钮状态同步（手机端 + 桌面端）
+// ==========================================
+
+/** 同步桌面端按钮与手机端按钮的状态 */
+function syncDesktopButtons() {
+    const mobileBtns = {
+        next: document.getElementById('next-btn'),
+        restart: document.getElementById('restart-btn'),
+        history: document.getElementById('view-history-btn')
+    };
+    const deskBtns = {
+        next: document.getElementById('next-btn-desk'),
+        restart: document.getElementById('restart-btn-desk'),
+        history: document.getElementById('view-history-btn-desk')
+    };
+
+    // 同步可见性
+    deskBtns.next.classList.toggle('hidden', mobileBtns.next.classList.contains('hidden'));
+    deskBtns.restart.classList.toggle('hidden', mobileBtns.restart.classList.contains('hidden'));
+    deskBtns.history.classList.toggle('hidden', mobileBtns.history.classList.contains('hidden'));
+
+    // 同步文字和点击事件
+    deskBtns.next.innerText = mobileBtns.next.innerText;
+    deskBtns.next.onclick = mobileBtns.next.onclick;
+}
+
+// ==========================================
+// 普通反馈弹窗
+// ==========================================
+
+function showFeedback(title, msg, icon, isSimpleAlert = false, diseases = null) {
+    // 有疾病科普时用宽幅，否则窄幅
+    setFeedbackWide(diseases && diseases.length > 0);
+    const el = document.getElementById('feedback-overlay');
+    el.classList.remove('hidden');
+    const titleEl = document.getElementById('feedback-title');
+    titleEl.innerText = title;
+    titleEl.className = "text-2xl lg:text-3xl font-black text-white uppercase tracking-tight";
+    document.getElementById('feedback-icon').innerText = icon;
+    document.getElementById('feedback-message').innerHTML = msg;
+
+    // 疾病科普
+    if (diseases && diseases.length > 0) {
+        const report = document.getElementById('disease-report');
+        report.classList.remove('hidden');
+        // 展示所有检出疾病的科普（合并多个疾病的内容）
+        let eduHTML = diseases.map(dKey => {
+            const dInfo = DISEASES[dKey];
+            return buildDiseaseEducationHTML(dInfo);
+        }).join('<div class="my-4 border-t border-rose-500/20"></div>');
+        document.getElementById('disease-content').innerHTML = eduHTML;
+    } else {
+        document.getElementById('disease-report').classList.add('hidden');
+    }
+
+    toggleHistoryView(false);
+
+    const nextBtn = document.getElementById('next-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const historyBtn = document.getElementById('view-history-btn');
+
+    restartBtn.classList.add('hidden');
+    nextBtn.classList.remove('hidden');
+    historyBtn.classList.add('hidden');
+
+    if (isSimpleAlert) {
+        nextBtn.innerText = "关闭";
+        nextBtn.onclick = function () {
+            el.classList.add('hidden');
+            nextBtn.onclick = nextTurn;
+            nextBtn.innerText = "继续";
+        };
+    } else {
+        nextBtn.innerText = "继续";
+        nextBtn.onclick = nextTurn;
+    }
+
+    syncDesktopButtons();
+}
+
+// ==========================================
+// 游戏结束弹窗（含疾病科普）
+// ==========================================
+
+function showGameOver(title, msg, icon, disease = null) {
+    setFeedbackWide(true);  // 宽幅：结算+科普两栏
+    STATE.isGameOver = true;
+    const el = document.getElementById('feedback-overlay');
+    el.classList.remove('hidden');
+
+    const titleEl = document.getElementById('feedback-title');
+    titleEl.innerText = title;
+    titleEl.className = "text-3xl font-black text-rose-500 uppercase tracking-tighter animate-pulse";
+    document.getElementById('feedback-icon').innerText = icon;
+
+    document.getElementById('feedback-message').innerHTML = msg + getStatsHTML();
+
+    if (disease) {
+        const report = document.getElementById('disease-report');
+        report.classList.remove('hidden');
+        document.getElementById('disease-content').innerHTML = buildDiseaseEducationHTML(disease);
+    } else {
+        document.getElementById('disease-report').classList.add('hidden');
+    }
+
+    renderHistoryList();
+    toggleHistoryView(false);
+
+    document.getElementById('next-btn').classList.add('hidden');
+    document.getElementById('restart-btn').classList.remove('hidden');
+    document.getElementById('view-history-btn').classList.remove('hidden');
+
+    syncDesktopButtons();
+}
+
+// ==========================================
+// 胜利弹窗
+// ==========================================
+
+function showWin() {
+    setFeedbackWide(true);  // 宽幅：结算两栏（无疾病科普时仍较窄，但保持一致性）
+    STATE.isGameOver = true;
+    const el = document.getElementById('feedback-overlay');
+    el.classList.remove('hidden');
+
+    const titleEl = document.getElementById('feedback-title');
+    titleEl.innerText = "幸存者";
+    titleEl.className = "text-3xl font-black text-emerald-400 uppercase tracking-tighter";
+    document.getElementById('feedback-icon').innerText = "✨";
+
+    document.getElementById('feedback-message').innerHTML =
+        `你成功清零了压抑值，且身体健康。<br><br>在这场充满迷雾和风险的游戏中，你靠着谨慎、策略和一点运气活了下来。` + getStatsHTML();
+
+    document.getElementById('disease-report').classList.add('hidden');
+
+    renderHistoryList();
+    toggleHistoryView(false);
+
+    document.getElementById('next-btn').classList.add('hidden');
+    document.getElementById('restart-btn').classList.remove('hidden');
+    document.getElementById('view-history-btn').classList.remove('hidden');
+
+    syncDesktopButtons();
+}
+
+// ==========================================
+// ★ 疾病科普 HTML 构建
+// ==========================================
+
+function buildDiseaseEducationHTML(disease) {
+    const edu = DISEASE_EDUCATION[disease.key];
+    if (!edu) {
+        return `<p><b>确诊：</b>${disease.name}</p><p><b>途径：</b>${disease.transmission}</p>`;
+    }
+
+    let html = '';
+
+    // ---- 头部摘要卡片 ----
+    html += `
+    <div class="bg-rose-950/40 border border-rose-500/30 rounded-xl p-4 mb-4">
+        <div class="flex items-center gap-3 mb-3">
+            <span class="text-3xl">🦠</span>
+            <div>
+                <h3 class="text-lg font-black text-rose-300">${disease.name}</h3>
+                <p class="text-xs text-rose-400/70 font-mono">病原体：${edu.pathogen.name}</p>
+            </div>
+        </div>
+        <p class="text-sm text-slate-300 leading-relaxed">${edu.overview}</p>
+    </div>`;
+
+    // ---- 折叠面板：传播途径详解 ----
+    html += buildAccordion("🔬 传播途径详解", "transmission", () => {
+        let inner = `<p class="text-slate-400 text-xs mb-3">${edu.pathogen.description}</p>`;
+        edu.transmissionRoutes.routes.forEach(r => {
+            const badgeClass = r.riskLevel === 'high' ? 'edu-badge-danger' :
+                              r.riskLevel === 'medium' ? 'edu-badge-warn' :
+                              r.riskLevel === 'low' ? 'edu-badge-info' : 'edu-badge-safe';
+            const badgeText = r.riskLevel === 'high' ? '高风险' :
+                             r.riskLevel === 'medium' ? '中风险' :
+                             r.riskLevel === 'low' ? '低风险' : '无风险';
+            inner += `
+            <div class="bg-slate-800/50 rounded-lg p-3 mb-2 border border-white/5">
+                <p class="mb-1">
+                    <span class="text-white font-bold text-sm">${r.route}</span>
+                    <span class="edu-badge ${badgeClass} ml-2 whitespace-nowrap">${badgeText}</span>
+                </p>
+                <p class="text-slate-400 text-xs leading-relaxed">${r.detail}</p>
+            </div>`;
+        });
+        return inner;
+    });
+
+    // ---- 折叠面板：潜伏期 ----
+    html += buildAccordion("⏱️ 潜伏期与窗口期", "incubation", () => {
+        return `<p class="text-slate-300 text-sm leading-relaxed">${edu.incubationPeriod}</p>`;
+    });
+
+    // ---- 折叠面板：临床症状 ----
+    html += buildAccordion("🩺 临床症状分期", "symptoms", () => {
+        let inner = '';
+        edu.symptoms.stages.forEach(s => {
+            inner += `
+            <div class="bg-slate-800/50 rounded-lg p-3 mb-2 border border-white/5">
+                <h4 class="text-white font-bold text-sm mb-1">${s.stage}</h4>
+                <p class="text-slate-300 text-xs leading-relaxed">${s.symptoms}</p>
+                ${s.note ? `<p class="text-amber-400/80 text-xs mt-1 italic">⚠️ ${s.note}</p>` : ''}
+            </div>`;
+        });
+        return inner;
+    });
+
+    // ---- 折叠面板：并发症 ----
+    html += buildAccordion("⚠️ 并发症与后果", "complications", () => {
+        return `<p class="text-slate-300 text-sm leading-relaxed">${edu.complications}</p>`;
+    });
+
+    // ---- 折叠面板：诊断方法 ----
+    html += buildAccordion("🔍 诊断方法", "diagnosis", () => {
+        return `<p class="text-slate-300 text-sm leading-relaxed">${edu.diagnosis}</p>`;
+    });
+
+    // ---- 折叠面板：治疗方案 ----
+    html += buildAccordion("💊 治疗与预后", "treatment", () => {
+        return `<p class="text-slate-300 text-sm leading-relaxed">${edu.treatment}</p>`;
+    });
+
+    // ---- 折叠面板：预防措施 ----
+    html += buildAccordion("🛡️ 预防措施", "prevention", () => {
+        return `<p class="text-slate-300 text-sm leading-relaxed">${edu.prevention}</p>`;
+    });
+
+    // ---- 折叠面板：流行病学数据 ----
+    html += buildAccordion("📊 流行病学数据", "epidemiology", () => {
+        return `<p class="text-slate-300 text-sm leading-relaxed">${edu.epidemiology}</p>`;
+    });
+
+    // ---- 折叠面板：感染风险详解 ----
+    html += buildAccordion("🎯 为什么你会被感染？", "riskFactors", () => {
+        return `<p class="text-slate-300 text-sm leading-relaxed">${edu.riskFactors}</p>`;
+    });
+
+    // ---- 权威引用 ----
+    html += `
+    <div class="mt-4 pt-4 border-t border-white/10">
+        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">📚 权威参考来源</h4>
+        <div class="space-y-1">`;
+    edu.references.forEach(ref => {
+        html += `
+            <a href="${ref.url}" target="_blank" rel="noopener noreferrer" class="edu-reference block">
+                🔗 ${ref.source} — ${ref.title}
+            </a>`;
+    });
+    html += `
+        </div>
+        <p class="text-[10px] text-slate-600 mt-3 italic">以上信息仅供参考和健康教育目的，不能替代专业医疗诊断和建议。如有疑虑，请前往正规医疗机构就诊。</p>
+    </div>`;
+
+    return html;
+}
+
+// ==========================================
+// 折叠面板辅助函数
+// ==========================================
+
+function buildAccordion(title, id, contentFn) {
+    const accordionId = `accordion-${id}`;
+    return `
+    <div class="edu-accordion" id="${accordionId}">
+        <div class="edu-accordion-header" onclick="toggleAccordion('${accordionId}')">
+            <span class="text-sm font-bold text-slate-200">${title}</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="edu-accordion-body">
+            <div class="edu-accordion-content">
+                ${contentFn()}
+            </div>
+        </div>
+    </div>`;
+}
+
+/** 切换折叠面板的展开/收起状态 */
+function toggleAccordion(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.toggle('open');
+    }
+}

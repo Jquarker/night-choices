@@ -180,7 +180,7 @@ function takeAction(actionType) {
     if (actionType === 'refuse') {
         recordHistory('refuse', false);
         if (!advanceTime(roll(CONFIG.passiveGain) + roll(CONFIG.refuseCost), 0)) {
-            showFeedback("继续寻找", "你选择了离开。压抑值上升，但至少你暂时是安全的。", "🏃");
+            showFeedback("继续寻找", "你选择了离开，但至少你暂时是安全的。", "🏃");
         }
         return;
     }

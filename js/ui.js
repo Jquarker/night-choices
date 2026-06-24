@@ -367,6 +367,7 @@ function togglePartnerDiseaseDetail(historyItem, index) {
     }
 
     _expandedPartnerIndex = index;
+    bindAccordions(panelEl);
 
     // 滚动面板到可见位置
     panelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -543,6 +544,7 @@ function showFeedback(title, msg, icon, isSimpleAlert = false, diseases = null) 
         const report = document.getElementById('disease-report');
         report.classList.remove('hidden');
         document.getElementById('disease-content').innerHTML = buildMultiDiseaseHTML(diseases);
+        bindAccordions(document.getElementById('disease-content'));
     } else {
         document.getElementById('disease-report').classList.add('hidden');
     }
@@ -587,6 +589,7 @@ function showGameOver(title, msg, icon, infectionKeys = null) {
         const report = document.getElementById('disease-report');
         report.classList.remove('hidden');
         document.getElementById('disease-content').innerHTML = buildMultiDiseaseHTML(infectionKeys);
+        bindAccordions(document.getElementById('disease-content'));
     } else {
         document.getElementById('disease-report').classList.add('hidden');
     }
@@ -700,6 +703,7 @@ function switchDiseaseTab(uniqueId, dKey, btn) {
     const dInfo = DISEASES[dKey];
     if (container && dInfo) {
         container.innerHTML = buildDiseaseEducationHTML(dInfo);
+        bindAccordions(container);
     }
 }
 
@@ -822,7 +826,7 @@ function buildAccordion(title, id, contentFn) {
     const accordionId = `accordion-${id}`;
     return `
     <div class="edu-accordion" id="${accordionId}">
-        <div class="edu-accordion-header" data-accordion="${accordionId}">
+        <div class="edu-accordion-header">
             <span class="text-sm font-bold text-slate-200">${title}</span>
             <span class="arrow">▼</span>
         </div>
@@ -835,14 +839,20 @@ function buildAccordion(title, id, contentFn) {
 }
 
 // ==========================================
-// 折叠面板：事件委托（全局监听，可靠响应动态插入的 DOM）
+// 折叠面板事件绑定（每次 DOM 插入后调用，比事件委托更可靠）
 // ==========================================
-document.addEventListener('click', function(e) {
-    const header = e.target.closest('.edu-accordion-header');
-    if (!header) return;
-    const accordion = header.closest('.edu-accordion');
-    if (accordion) {
-        e.stopPropagation();
-        accordion.classList.toggle('open');
-    }
-});
+function bindAccordions(rootEl) {
+    if (!rootEl) return;
+    rootEl.querySelectorAll('.edu-accordion-header').forEach(function(header) {
+        // 避免重复绑定
+        if (header._accordionBound) return;
+        header._accordionBound = true;
+        header.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var accordion = header.closest('.edu-accordion');
+            if (accordion) {
+                accordion.classList.toggle('open');
+            }
+        });
+    });
+}

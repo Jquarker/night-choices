@@ -15,7 +15,7 @@ const CONFIG = {
 
     // 非性行为压抑变化 [min, max]
     chatCost:          { min: 2, max: 5 },     // 聊天消耗
-    refuseCost:        { min: 2, max: 6 },     // 拒绝额外消耗
+    refuseCost:        { min: -5, max: 6 },     // 拒绝额外消耗
     hospitalCost:      { min: 10, max: 18 },   // 去医院压抑增长
 
     // 各行为：压抑降低 reward [min, max]

@@ -139,11 +139,14 @@ function renderPartner() {
             '<span class="block text-[8px] lg:text-[9px] opacity-60 mt-0.5">收益 ' + rewardRange + ' | 压力 +' + stressRange + '</span>';
     }
 
-    // ---- 换一个按钮 ----
+    // ---- 换一个按钮（显示总压抑值变化 = 被动增长 + 拒绝消耗） ----
     var refuseBtn = document.getElementById('btn-refuse');
     if (refuseBtn) {
         var pg = CONFIG.passiveGain;
-        refuseBtn.innerHTML = '<span>👋</span> 换一个 (压抑值+' + pg.min + '~' + pg.max + ')';
+        var rc = CONFIG.refuseCost;
+        var totalMin = pg.min + rc.min;
+        var totalMax = pg.max + rc.max;
+        refuseBtn.innerHTML = '<span>👋</span> 换一个 (压抑值+' + totalMin + '~' + totalMax + ')';
     }
 
     // ---- 聊天按钮 ----

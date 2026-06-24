@@ -85,12 +85,38 @@ function renderPartner() {
             div.innerHTML = isPanic ? `<span class="blur-sm">???</span>` : `<span>❓</span> 隐藏信息`;
         } else {
             if (tag.constraint) constraints.push(tag.constraint);
-            div.className = `tag-badge tag-reveal px-2 py-1 rounded-lg text-[10px] lg:text-xs font-bold text-white shadow-lg flex items-center gap-1 border border-white/10 ${tag.color}`;
+            let baseClass = `tag-badge tag-reveal px-2 py-1 rounded-lg text-[10px] lg:text-xs font-bold text-white shadow-lg border border-white/10 ${tag.color}`;
             let icon = '⏺';
             if (tag.color.includes('red')) icon = '⚠️';
             else if (tag.constraint) icon = '🚫';
             else if (tag.color.includes('emerald')) icon = '🛡️';
-            div.innerHTML = `<span class="opacity-75">${icon}</span> ${tag.text}`;
+
+            if (tag.clue) {
+                // 带 clue 的标签：flex-col 结构，首行图标+文字+?，第二行展开 clue
+                div.className = baseClass + ' has-clue flex flex-col';
+                div.innerHTML = `
+                    <div class="flex items-center gap-1">
+                        <span class="opacity-75 flex-shrink-0">${icon}</span>
+                        <span class="flex-1 min-w-0">${tag.text}</span>
+                        <span class="clue-dot flex-shrink-0 text-[8px] lg:text-[9px] bg-white/20 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center">?</span>
+                    </div>
+                    <div class="clue-text hidden w-full text-[9px] lg:text-[10px] text-amber-200/90 leading-snug pt-1 mt-1 border-t border-white/10">
+                        💡 ${tag.clue}
+                    </div>`;
+                // 移动端点击 ? 切换展开
+                div.querySelector('.clue-dot').addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // 关闭其他已展开的标签
+                    container.querySelectorAll('.has-clue.expanded').forEach(function(el) {
+                        if (el !== div) el.classList.remove('expanded');
+                    });
+                    div.classList.toggle('expanded');
+                });
+            } else {
+                // 无 clue 的标签：原有单行结构
+                div.className = baseClass + ' flex items-center gap-1';
+                div.innerHTML = `<span class="opacity-75">${icon}</span> ${tag.text}`;
+            }
         }
         container.appendChild(div);
     });

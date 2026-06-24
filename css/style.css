@@ -189,6 +189,85 @@ body {
 .edu-badge-safe   { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
 
 /* ============================================
+   Tag Clue 交互：桌面悬浮 / 手机点击展开
+   ============================================ */
+
+.has-clue {
+    position: relative;
+    transition: all 0.2s ease;
+}
+.clue-dot {
+    transition: background-color 0.15s;
+}
+.clue-text {
+    animation: clueFadeIn 0.2s ease;
+}
+@keyframes clueFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 桌面：鼠标悬停显示浮动气泡 */
+@media (hover: hover) and (pointer: fine) {
+    .has-clue .clue-dot {
+        cursor: default;
+    }
+    .has-clue .clue-text {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: max-content;
+        max-width: 240px;
+        background: rgba(15, 23, 42, 0.98);
+        border: 1px solid rgba(251, 191, 36, 0.4);
+        border-radius: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.7rem;
+        line-height: 1.5;
+        color: #fde68a;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+        z-index: 30;
+        white-space: normal;
+        pointer-events: none;
+    }
+    /* 小三角箭头 */
+    .has-clue .clue-text::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: rgba(251, 191, 36, 0.4);
+    }
+    .has-clue:hover .clue-text {
+        display: block;
+    }
+    /* 悬浮时 ? 高亮 */
+    .has-clue:hover .clue-dot {
+        background: rgba(251, 191, 36, 0.4);
+    }
+}
+
+/* 移动端：点击 ? 内联展开 */
+@media (hover: none), (pointer: coarse) {
+    .has-clue {
+        flex-wrap: wrap;
+    }
+    .has-clue .clue-text {
+        display: none;
+    }
+    .has-clue.expanded .clue-text {
+        display: block;
+    }
+    .has-clue.expanded .clue-dot {
+        background: rgba(251, 191, 36, 0.4);
+    }
+}
+
+/* ============================================
    Responsive: Desktop (lg+)
    ============================================ */
 

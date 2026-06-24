@@ -146,7 +146,8 @@ function renderPartner() {
         var rc = CONFIG.refuseCost;
         var totalMin = pg.min + rc.min;
         var totalMax = pg.max + rc.max;
-        refuseBtn.innerHTML = '<span>👋</span> 换一个 (压抑值+' + totalMin + '~' + totalMax + ')';
+        var sign = totalMin < 0 ? '' : '+';
+        refuseBtn.innerHTML = '<span>👋</span> 换一个 (压抑值' + sign + totalMin + '~+' + totalMax + ')';
     }
 
     // ---- 聊天按钮 ----

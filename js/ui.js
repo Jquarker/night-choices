@@ -822,7 +822,7 @@ function buildAccordion(title, id, contentFn) {
     const accordionId = `accordion-${id}`;
     return `
     <div class="edu-accordion" id="${accordionId}">
-        <div class="edu-accordion-header" onclick="toggleAccordion('${accordionId}', event)">
+        <div class="edu-accordion-header" data-accordion="${accordionId}">
             <span class="text-sm font-bold text-slate-200">${title}</span>
             <span class="arrow">▼</span>
         </div>
@@ -834,11 +834,15 @@ function buildAccordion(title, id, contentFn) {
     </div>`;
 }
 
-/** 切换折叠面板的展开/收起状态 */
-function toggleAccordion(id, event) {
-    if (event) event.stopPropagation();
-    const el = document.getElementById(id);
-    if (el) {
-        el.classList.toggle('open');
+// ==========================================
+// 折叠面板：事件委托（全局监听，可靠响应动态插入的 DOM）
+// ==========================================
+document.addEventListener('click', function(e) {
+    const header = e.target.closest('.edu-accordion-header');
+    if (!header) return;
+    const accordion = header.closest('.edu-accordion');
+    if (accordion) {
+        e.stopPropagation();
+        accordion.classList.toggle('open');
     }
-}
+});

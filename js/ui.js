@@ -45,6 +45,113 @@ function updateStatsUI() {
 }
 
 // ==========================================
+// Clue Tooltip 单例（Portal 模式，渲染到 body，避免遮挡）
+// ==========================================
+
+var ClueTooltip = (function() {
+    var _el = null;
+    var _anchor = null;
+    var _isHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    var _scrollTicking = false;
+
+    function _init() {
+        if (_el) return;
+        _el = document.createElement('div');
+        _el.className = 'clue-tooltip';
+        _el.innerHTML = '<span class="clue-tooltip-arrow"></span><span class="clue-tooltip-body"></span>';
+        document.body.appendChild(_el);
+
+        // 滚动处理：桌面节流重定位，移动端直接隐藏避免飘移
+        document.addEventListener('scroll', function() {
+            if (!_anchor) return;
+            if (_isHover) {
+                if (!_scrollTicking) {
+                    requestAnimationFrame(function() { _reposition(); _scrollTicking = false; });
+                    _scrollTicking = true;
+                }
+            } else {
+                hide();
+            }
+        }, true);
+
+        window.addEventListener('resize', function() { if (_anchor) _reposition(); });
+    }
+
+    function show(text, anchor) {
+        _init();
+        _el.querySelector('.clue-tooltip-body').textContent = '💡 ' + text;
+        _anchor = anchor;
+        _el.classList.add('clue-tooltip-visible');
+        // 双 rAF 确保移动端布局稳定后再定位
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { _reposition(); });
+        });
+    }
+
+    function hide() {
+        if (_el) _el.classList.remove('clue-tooltip-visible', 'clue-tooltip-flip');
+        _anchor = null;
+    }
+
+    function _reposition() {
+        if (!_el || !_anchor) return;
+        var a = _anchor.getBoundingClientRect();
+        var t = _el.getBoundingClientRect();
+        var G = 8;
+        var vw = window.innerWidth;
+        // 移动端使用 visualViewport 获取准确可视高度
+        var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+        // 默认在锚点上方
+        var top = a.top - t.height - G;
+        var left = a.left + a.width / 2 - t.width / 2;
+        var flip = false;
+
+        // 上方空间不足 → 翻转到下方
+        if (top < G) {
+            top = a.bottom + G;
+            flip = true;
+        }
+
+        // 翻转到下方后若仍超出底部 → 回退上方
+        if (flip && top + t.height > vh - G) {
+            top = a.top - t.height - G;
+            flip = false;
+        }
+
+        // 兜底：不超出视口顶部
+        if (top < G) top = G;
+
+        // 水平边界
+        left = Math.max(G, Math.min(left, vw - t.width - G));
+
+        _el.style.top = top + 'px';
+        _el.style.left = left + 'px';
+        _el.classList.toggle('clue-tooltip-flip', flip);
+
+        // 箭头跟随锚点水平中心
+        var arrow = _el.querySelector('.clue-tooltip-arrow');
+        if (arrow) {
+            arrow.style.left = Math.max(8, Math.min(a.left + a.width / 2 - left, t.width - 8)) + 'px';
+        }
+    }
+
+    // 点击 tooltip 外部时关闭
+    document.addEventListener('click', function(e) {
+        if (_anchor && !_anchor.contains(e.target) && _el && !_el.contains(e.target)) {
+            hide();
+        }
+    });
+
+    return {
+        show: show,
+        hide: hide,
+        _isHover: _isHover,
+        _anchor: function() { return _anchor; }
+    };
+})();
+
+// ==========================================
 // 伴侣渲染
 // ==========================================
 
@@ -92,25 +199,30 @@ function renderPartner() {
             else if (tag.color.includes('emerald')) icon = '🛡️';
 
             if (tag.clue) {
-                // 带 clue 的标签：flex-col 结构，首行图标+文字+?，第二行展开 clue
-                div.className = baseClass + ' has-clue flex flex-col';
+                // 带 clue 的标签：单行结构 + ? 圆点，tooltip 通过 Portal 浮层展示
+                div.className = baseClass + ' flex items-center gap-1';
                 div.innerHTML = `
-                    <div class="flex items-center gap-1">
-                        <span class="opacity-75 flex-shrink-0">${icon}</span>
-                        <span class="flex-1 min-w-0">${tag.text}</span>
-                        <span class="clue-dot flex-shrink-0 text-[8px] lg:text-[9px] bg-white/20 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center">?</span>
-                    </div>
-                    <div class="clue-text hidden w-full text-[9px] lg:text-[10px] text-amber-200/90 leading-snug pt-1 mt-1 border-t border-white/10">
-                        💡 ${tag.clue}
-                    </div>`;
-                // 移动端点击 ? 切换展开
-                div.querySelector('.clue-dot').addEventListener('click', function(e) {
+                    <span class="opacity-75 flex-shrink-0">${icon}</span>
+                    <span class="flex-1 min-w-0">${tag.text}</span>
+                    <span class="clue-dot flex-shrink-0 text-[8px] lg:text-[9px] bg-white/20 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center">?</span>`;
+
+                var dot = div.querySelector('.clue-dot');
+                var clueText = tag.clue;
+
+                // 桌面端：hover 显示 tooltip
+                if (ClueTooltip._isHover) {
+                    dot.addEventListener('mouseenter', function() { ClueTooltip.show(clueText, dot); });
+                    dot.addEventListener('mouseleave', function() { ClueTooltip.hide(); });
+                }
+
+                // 点击 ? 切换 tooltip（桌面/移动端通用）
+                dot.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    // 关闭其他已展开的标签
-                    container.querySelectorAll('.has-clue.expanded').forEach(function(el) {
-                        if (el !== div) el.classList.remove('expanded');
-                    });
-                    div.classList.toggle('expanded');
+                    if (ClueTooltip._anchor() === dot) {
+                        ClueTooltip.hide();
+                    } else {
+                        ClueTooltip.show(clueText, dot);
+                    }
                 });
             } else {
                 // 无 clue 的标签：原有单行结构

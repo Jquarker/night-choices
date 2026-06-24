@@ -197,15 +197,20 @@ function takeAction(actionType) {
         }
     }
 
-    // ---- 感染判定（新模型，含安全套破损机制） ----
+    // ---- 感染判定（允许多疾病同时感染） ----
     // 戴套行为先统一判定是否破损（每回合一次，非每种疾病一次）
     let condomFailed = false;
     if (actionType.includes('condom') && partner.diseases.length > 0) {
         condomFailed = Math.random() < CONFIG.CONDOM_FAILURE_RATE;
     }
 
-    if (!STATE.isInfected && partner.diseases.length > 0) {
+    let newInfections = [];  // 本回合新感染的疾病 key 列表
+
+    if (partner.diseases.length > 0) {
         for (let dKey of partner.diseases) {
+            // 已经感染过的疾病不再重复判定
+            if (STATE.infections.includes(dKey)) continue;
+
             const disease = DISEASES[dKey];
             const chance = getTransmissionChance(actionType, disease, condomFailed);
 
@@ -215,15 +220,16 @@ function takeAction(actionType) {
             }
 
             if (Math.random() < chance) {
+                STATE.infections.push(dKey);
                 STATE.isInfected = true;
-                STATE.infectionData = disease;
-                infectedThisTurn = true;
-                break;
+                newInfections.push(dKey);
             }
         }
     }
 
-    recordHistory(actionType, infectedThisTurn);
+    infectedThisTurn = newInfections.length > 0;
+
+    recordHistory(actionType, infectedThisTurn, newInfections);
 
     // 安全行为低概率获得试纸
     let gainedKit = false;
@@ -244,7 +250,7 @@ function takeAction(actionType) {
 
     if (STATE.frustration === 0) {
         if (STATE.isInfected) {
-            showGameOver("糟糕的胜利", "你的压抑值清零了，你感到无比轻松...<br>但在几天后，你的身体开始出现异常反应。<br>你虽然释放了欲望，却输掉了健康。", "🥀", STATE.infectionData);
+            showGameOver("糟糕的胜利", "你的压抑值清零了，你感到无比轻松...<br>但在几天后，你的身体开始出现异常反应。<br>你虽然释放了欲望，却输掉了健康。", "🥀", STATE.infections);
         } else {
             showWin();
         }
@@ -346,7 +352,7 @@ function goToHospital() {
     updateStatsUI();
 
     if (STATE.isInfected) {
-        showGameOver("确诊感染", `很遗憾，医院的检查结果显示你已感染。<br>之前的侥幸心理终究没能救你。`, "🏥", STATE.infectionData);
+        showGameOver("确诊感染", `很遗憾，医院的检查结果显示你已感染。<br>之前的侥幸心理终究没能救你。`, "🏥", STATE.infections);
     } else {
         STATE.items.testkit++;
         updateStatsUI();
@@ -368,7 +374,7 @@ function nextTurn() {
 // 历史记录
 // ==========================================
 
-function recordHistory(action, infectedThisTurn) {
+function recordHistory(action, infectedThisTurn, newInfections = []) {
     const p = STATE.currentPartner;
     let outcomeLabel = "", outcomeClass = "";
 
@@ -396,6 +402,7 @@ function recordHistory(action, infectedThisTurn) {
         diseases: p.diseases,
         action: action,
         outcomeLabel: outcomeLabel,
-        outcomeClass: outcomeClass
+        outcomeClass: outcomeClass,
+        caughtDiseases: [...newInfections]  // 本回合被感染的疾病列表
     });
 }

@@ -8,8 +8,8 @@ let STATE = {
     turn: 1,                 // 当前回合
     items: { testkit: 1 },   // 试纸初始为1，需通过医院或安全行为获取
     currentPartner: null,    // 当前伴侣对象
-    isInfected: false,       // 是否已被感染
-    infectionData: null,     // 感染的具体疾病数据
+    isInfected: false,       // 是否已被感染（便捷布尔值）
+    infections: [],          // 已感染的所有疾病 key 数组 ["HIV", "SYPHILIS", ...]
     isGameOver: false,       // 游戏是否已结束
     history: [],             // 约会历史记录
     exposureCounts: {}       // 各病原体暴露次数 { HIV: 2, SYPHILIS: 1, ... }
@@ -23,7 +23,7 @@ function resetState() {
     STATE.items = { testkit: 1 };
     STATE.isGameOver = false;
     STATE.isInfected = false;
-    STATE.infectionData = null;
+    STATE.infections = [];
     STATE.history = [];
     STATE.exposureCounts = {};
 }

@@ -247,19 +247,27 @@ function returnToIntro() {
 // 历史记录列表渲染
 // ==========================================
 
+// 当前展开的伴侣详情索引（-1 = 无展开）
+let _expandedPartnerIndex = -1;
+
 function renderHistoryList() {
     const list = document.getElementById('history-list');
     list.innerHTML = '';
+    _expandedPartnerIndex = -1;
 
-    STATE.history.forEach((item) => {
+    STATE.history.forEach((item, index) => {
         const div = document.createElement('div');
-        div.className = "flex items-start gap-3 p-3 bg-slate-800/50 rounded-lg border border-white/5";
+        const hasDiseases = item.diseases.length > 0;
+        const clickableClass = hasDiseases ? 'cursor-pointer hover:bg-slate-700/50 transition-colors' : '';
 
-        let statusIcon = item.diseases.length > 0 ? "<span class='absolute -bottom-1 -right-1 text-[10px]'>🦠</span>" : "";
+        div.className = `history-entry flex items-start gap-3 p-3 bg-slate-800/50 rounded-lg border border-white/5 ${clickableClass}`;
+        div.setAttribute('data-history-index', index);
+
+        let statusIcon = hasDiseases ? "<span class='absolute -bottom-1 -right-1 text-[10px]'>🦠</span>" : "";
 
         let tagHTML = item.tags.map(t => `<span class='inline-block px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-300 mr-1 mb-1'>${t.text}</span>`).join("");
-        if (item.diseases.length > 0) {
-            tagHTML += `<br><span class='text-[10px] text-rose-400 font-bold'>携带: ${item.diseases.map(d => DISEASES[d].name).join(", ")}</span>`;
+        if (hasDiseases) {
+            tagHTML += `<br><span class='text-[10px] text-rose-400 font-bold cursor-pointer hover:underline'>🔍 携带: ${item.diseases.map(d => DISEASES[d].name).join(", ")}</span>`;
         } else {
             tagHTML += `<br><span class='text-[10px] text-emerald-500/50'>健康</span>`;
         }
@@ -275,8 +283,98 @@ function renderHistoryList() {
                 <span class="px-2 py-1 rounded text-[10px] font-bold border ${item.outcomeClass}">${item.outcomeLabel}</span>
             </div>
         `;
+
+        // 点击携带疾病的伴侣条目 → 展开/收起疾病详情
+        if (hasDiseases) {
+            div.addEventListener('click', function(e) {
+                togglePartnerDiseaseDetail(item, index);
+            });
+        }
+
         list.appendChild(div);
     });
+}
+
+/**
+ * 切换伴侣疾病详情面板：展开/收起
+ * - 点击同一伴侣 → 收起
+ * - 点击不同伴侣 → 切换到该伴侣
+ */
+function togglePartnerDiseaseDetail(historyItem, index) {
+    if (!historyItem.diseases || historyItem.diseases.length === 0) return;
+
+    // 点击已展开的伴侣 → 收起
+    if (_expandedPartnerIndex === index) {
+        closePartnerDiseaseDetail();
+        return;
+    }
+
+    // 先移除旧面板（如果有）
+    removeDetailPanel();
+
+    const list = document.getElementById('history-list');
+    if (!list) return;
+
+    // 取消所有高亮
+    list.querySelectorAll('.ring-2').forEach(el => el.classList.remove('ring-2', 'ring-rose-500/50'));
+
+    // 高亮当前条目
+    const entries = list.querySelectorAll('.history-entry');
+    if (entries[index]) {
+        entries[index].classList.add('ring-2', 'ring-rose-500/50');
+    }
+
+    // 动态创建详情面板
+    const diseaseNames = historyItem.diseases.map(d => DISEASES[d].name).join('、');
+    const detailHTML = `
+        <div id="partner-disease-detail" class="history-detail mt-1 bg-rose-950/30 border border-rose-500/30 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-sm font-bold text-rose-300">🦠 该伴侣携带病原体：<span class="text-rose-200">${diseaseNames}</span></h4>
+                <button onclick="event.stopPropagation(); closePartnerDiseaseDetail();" class="text-slate-400 hover:text-white text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded-lg border border-white/10 transition-colors">
+                    ✕ 关闭
+                </button>
+            </div>
+            <div class="text-xs text-rose-100/80">${buildMultiDiseaseHTML(historyItem.diseases)}</div>
+        </div>
+    `;
+
+    // 插入到选中的伴侣条目之后
+    const detailDiv = document.createElement('div');
+    detailDiv.innerHTML = detailHTML;
+    const panelEl = detailDiv.firstElementChild;
+
+    if (entries[index]) {
+        entries[index].after(panelEl);
+    } else {
+        list.appendChild(panelEl);
+    }
+
+    _expandedPartnerIndex = index;
+
+    // 滚动面板到可见位置
+    panelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/**
+ * 移除动态插入的疾病详情面板
+ */
+function removeDetailPanel() {
+    const panel = document.getElementById('partner-disease-detail');
+    if (panel) panel.remove();
+}
+
+/**
+ * 关闭伴侣疾病详情面板
+ */
+function closePartnerDiseaseDetail() {
+    removeDetailPanel();
+    _expandedPartnerIndex = -1;
+
+    // 取消高亮
+    const list = document.getElementById('history-list');
+    if (list) {
+        list.querySelectorAll('.ring-2').forEach(el => el.classList.remove('ring-2', 'ring-rose-500/50'));
+    }
 }
 
 // ==========================================
@@ -427,12 +525,7 @@ function showFeedback(title, msg, icon, isSimpleAlert = false, diseases = null) 
     if (diseases && diseases.length > 0) {
         const report = document.getElementById('disease-report');
         report.classList.remove('hidden');
-        // 展示所有检出疾病的科普（合并多个疾病的内容）
-        let eduHTML = diseases.map(dKey => {
-            const dInfo = DISEASES[dKey];
-            return buildDiseaseEducationHTML(dInfo);
-        }).join('<div class="my-4 border-t border-rose-500/20"></div>');
-        document.getElementById('disease-content').innerHTML = eduHTML;
+        document.getElementById('disease-content').innerHTML = buildMultiDiseaseHTML(diseases);
     } else {
         document.getElementById('disease-report').classList.add('hidden');
     }
@@ -466,7 +559,7 @@ function showFeedback(title, msg, icon, isSimpleAlert = false, diseases = null) 
 // 游戏结束弹窗（含疾病科普）
 // ==========================================
 
-function showGameOver(title, msg, icon, disease = null) {
+function showGameOver(title, msg, icon, infectionKeys = null) {
     setFeedbackWide(true);  // 宽幅：结算+科普两栏
     STATE.isGameOver = true;
     const el = document.getElementById('feedback-overlay');
@@ -479,10 +572,10 @@ function showGameOver(title, msg, icon, disease = null) {
 
     document.getElementById('feedback-message').innerHTML = msg + getStatsHTML();
 
-    if (disease) {
+    if (infectionKeys && infectionKeys.length > 0) {
         const report = document.getElementById('disease-report');
         report.classList.remove('hidden');
-        document.getElementById('disease-content').innerHTML = buildDiseaseEducationHTML(disease);
+        document.getElementById('disease-content').innerHTML = buildMultiDiseaseHTML(infectionKeys);
     } else {
         document.getElementById('disease-report').classList.add('hidden');
     }
@@ -528,8 +621,67 @@ function showWin() {
 }
 
 // ==========================================
-// ★ 疾病科普 HTML 构建
+// ★ 多疾病切换展示（结算界面）
 // ==========================================
+
+/**
+ * 构建多疾病切换面板
+ * @param {string[]} diseaseKeys - 疾病 key 数组，如 ["HIV", "SYPHILIS"]
+ */
+function buildMultiDiseaseHTML(diseaseKeys) {
+    if (!diseaseKeys || diseaseKeys.length === 0) return '';
+
+    // 单疾病：直接展示
+    if (diseaseKeys.length === 1) {
+        return buildDiseaseEducationHTML(DISEASES[diseaseKeys[0]]);
+    }
+
+    // 多疾病：标签切换 + 内容区
+    const uniqueId = 'multi-disease-' + Date.now();
+    let html = '';
+
+    // ---- 疾病标签栏 ----
+    html += `<div class="flex flex-wrap gap-2 mb-4" id="${uniqueId}-tabs">`;
+    diseaseKeys.forEach((dKey, idx) => {
+        const d = DISEASES[dKey];
+        const activeClass = idx === 0 ? 'bg-rose-600/40 border-rose-400 text-rose-200' : 'bg-slate-800/50 border-white/10 text-slate-400 hover:bg-slate-700/50';
+        html += `
+        <button onclick="switchDiseaseTab('${uniqueId}', '${dKey}', this)"
+                class="disease-tab px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${activeClass}"
+                data-dkey="${dKey}">
+            🦠 ${d.name}
+        </button>`;
+    });
+    html += `</div>`;
+
+    // ---- 疾病内容区（初始显示第一个） ----
+    html += `<div id="${uniqueId}-content">`;
+    html += buildDiseaseEducationHTML(DISEASES[diseaseKeys[0]]);
+    html += `</div>`;
+
+    return html;
+}
+
+/**
+ * 切换疾病标签
+ */
+function switchDiseaseTab(uniqueId, dKey, btn) {
+    // 更新标签样式
+    const tabs = document.getElementById(uniqueId + '-tabs');
+    if (tabs) {
+        tabs.querySelectorAll('.disease-tab').forEach(t => {
+            t.className = t.className.replace(/bg-rose-600\/40 border-rose-400 text-rose-200/g, 'bg-slate-800/50 border-white/10 text-slate-400 hover:bg-slate-700/50');
+        });
+    }
+    btn.className = btn.className.replace(/bg-slate-800\/50 border-white\/10 text-slate-400 hover:bg-slate-700\/50/g, 'bg-rose-600/40 border-rose-400 text-rose-200');
+
+    // 切换内容
+    const container = document.getElementById(uniqueId + '-content');
+    const dInfo = DISEASES[dKey];
+    if (container && dInfo) {
+        container.innerHTML = buildDiseaseEducationHTML(dInfo);
+    }
+}
 
 function buildDiseaseEducationHTML(disease) {
     const edu = DISEASE_EDUCATION[disease.key];

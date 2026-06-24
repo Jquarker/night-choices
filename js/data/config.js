@@ -1,6 +1,6 @@
 /* ============================================
    config.js - 游戏数值常量
-   所有概率参数集中管理，便于调整与 AB 测试
+   所有概率参数集中管理，便于调整
    全部概率保持最多两位小数
    ============================================ */
 
@@ -10,21 +10,21 @@ const CONFIG = {
     startFrustration: { min: 50, max: 90 },
 
     // 每回合被动压抑增长 [min, max]
-    passiveGain:       { min: 6, max: 10 },    // 曾固定 8
+    passiveGain:       { min: 5, max: 8 },
     anxietyGainPassive:{ min: 1, max: 3 },     // 高压力时额外被动增加
 
     // 非性行为压抑变化 [min, max]
-    chatCost:          { min: 2, max: 5 },     // 聊天消耗（曾固定 3）
-    refuseCost:        { min: 0, max: 0 },     // 拒绝额外消耗（当前为0）
-    hospitalCost:      { min: 14, max: 24 },   // 去医院压抑增长（曾固定 10）
+    chatCost:          { min: 2, max: 5 },     // 聊天消耗
+    refuseCost:        { min: 2, max: 6 },     // 拒绝额外消耗
+    hospitalCost:      { min: 10, max: 18 },   // 去医院压抑增长
 
     // 各行为：压抑降低 reward [min, max]
     // 区分度：oral_condom < sex_condom < oral_raw < sex_raw
     // 相邻档位允许小幅重叠，但首尾绝不重叠
     rewards: {
-        oral_condom: { min: 4,  max: 8  },    // 最低收益，最安全
-        sex_condom:  { min: 8,  max: 13 },    // 中低收益
-        oral_raw:    { min: 10, max: 16 },    // 中高收益
+        oral_condom: { min: 6,  max: 10 },    // 最低收益，最安全
+        sex_condom:  { min: 11, max: 17 },    // 中低收益
+        oral_raw:    { min: 12, max: 18 },    // 中高收益
         sex_raw:     { min: 18, max: 28 }     // 最高收益，最高风险
     },
 
@@ -32,20 +32,19 @@ const CONFIG = {
     // 区分度：oral_condom < sex_condom << oral_raw < sex_raw
     stress: {
         oral_condom: { min: 1,  max: 4  },    // 几乎无压力
-        sex_condom:  { min: 3,  max: 8  },    // 轻微压力
+        sex_condom:  { min: 3,  max: 12  },    // 轻微压力
         oral_raw:    { min: 10, max: 20 },    // 明显压力
-        sex_raw:     { min: 22, max: 38 }     // 严重压力
+        sex_raw:     { min: 15, max: 30 }     // 严重压力
     },
 
     // ---- 体征缩放焦虑 ----
     // 伴侣身上每多一个可见高危体征（红色/紫色标签），压力额外增加
     ANXIETY_SIGN: {
         perSignMultiplier: 0.50,  // 每个可见体征增加 50% 基础压力
-        maxMultiplier:     3.00   // 压力倍率上限（最多×3）
+        maxMultiplier:     2.00   // 压力倍率上限（最多×2）
     },
 
     // ---- 流行病学参数 ----
-    // 注意：以下数值均为教育性夸张，不代表真实流行病学数据
     // 游戏帮助中已标注"为教育目的已放大风险"
 
     // 伴侣携带至少一种性传播疾病的概率
@@ -54,12 +53,12 @@ const CONFIG = {
     // 基准单次暴露传染率（无保护行为，全部 ≤ 两位小数）
     TRANSMISSION_RATES: {
         sex_raw: {
-            HIV: 0.06,          // 教育夸张值
-            GONORRHEA: 0.70,    // 教育夸张值
-            SYPHILIS: 0.80,     // 教育夸张值（活动性病灶）
-            HPV: 0.48,          // 教育夸张值
-            HERPES: 0.65,       // 教育夸张值（有排毒时传染性强）
-            CRABS: 0.16         // 教育夸张值
+            HIV: 0.06,
+            GONORRHEA: 0.70,
+            SYPHILIS: 0.80,
+            HPV: 0.48,
+            HERPES: 0.65,
+            CRABS: 0.16
         },
         oral_raw: {
             HIV: 0.01,          // 口交风险显著低于阴交

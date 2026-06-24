@@ -122,7 +122,9 @@ body {
     padding: 0.75rem 1rem;
     cursor: pointer;
     transition: background-color 0.2s;
-    user-select: none;
+    user-select: auto;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .edu-accordion-header:hover {

@@ -13,6 +13,13 @@ function initGame() {
     generateNewPartner();
 }
 
+/** 从结算/失败弹窗直接重新开始，跳过首页 */
+function restartGame() {
+    document.getElementById('feedback-overlay').classList.add('hidden');
+    document.getElementById('game-container').classList.remove('hidden');
+    initGame();
+}
+
 // ==========================================
 // 伴侣生成
 // ==========================================

@@ -9,14 +9,16 @@
 
 function updateStatsUI() {
     const fBar = document.getElementById('frustration-bar');
+    const aBar = document.getElementById('anxiety-bar');
+    const gameContent = document.getElementById('game-content');
+    if (!fBar || !aBar || !gameContent) return;
+
     fBar.style.width = `${STATE.frustration}%`;
     document.getElementById('frustration-val').innerText = `${STATE.frustration}%`;
 
-    const aBar = document.getElementById('anxiety-bar');
     aBar.style.width = `${STATE.anxiety}%`;
     document.getElementById('anxiety-val').innerText = `${STATE.anxiety}%`;
 
-    const gameContent = document.getElementById('game-content');
     const panicWarn = document.getElementById('panic-warning');
 
     if (STATE.anxiety >= 80) {
@@ -31,18 +33,31 @@ function updateStatsUI() {
         aBar.classList.add('bg-gradient-to-r');
     }
 
-    document.getElementById('turn-count').innerText = STATE.turn.toString().padStart(2, '0');
-    document.getElementById('item-testkit').innerText = `x${STATE.items.testkit}`;
-    if (STATE.items.testkit === 0) {
-        document.getElementById('item-testkit').className = "text-xs font-bold text-slate-600";
-    } else {
-        document.getElementById('item-testkit').className = "text-xs font-bold text-sky-400";
+    const turnCount = document.getElementById('turn-count');
+    const kitEl = document.getElementById('item-testkit');
+    if (turnCount) turnCount.innerText = STATE.turn.toString().padStart(2, '0');
+    if (kitEl) {
+        kitEl.innerText = `x${STATE.items.testkit}`;
+        kitEl.className = STATE.items.testkit === 0
+            ? "text-xs font-bold text-slate-600"
+            : "text-xs font-bold text-sky-400";
     }
 }
 
 // ==========================================
 // 伴侣渲染
 // ==========================================
+
+/**
+ * 格式化调情台词：在句末标点处换行，配合 CSS text-wrap:pretty 避免孤字
+ * @param {string} text - 原始台词
+ * @returns {string} 带 <br> 的 HTML
+ */
+function formatFlirtText(text) {
+    // 在句末标点后插入换行（。！？… ~  —）
+    var html = '"' + text.replace(/([。！？…])(?!$)/g, '$1<br>') + '"';
+    return html;
+}
 
 function renderPartner() {
     const p = STATE.currentPartner;
@@ -51,7 +66,8 @@ function renderPartner() {
     if (!p._statusShown) {
         document.getElementById('partner-status').classList.add('hidden');
     }
-    document.getElementById('flirt-text').innerText = `"${FLIRT_LINES[Math.floor(Math.random() * FLIRT_LINES.length)]}"`;
+    const rawLine = FLIRT_LINES[Math.floor(Math.random() * FLIRT_LINES.length)];
+    document.getElementById('flirt-text').innerHTML = formatFlirtText(rawLine);
 
     const container = document.getElementById('tags-container');
     container.innerHTML = '';
@@ -65,11 +81,11 @@ function renderPartner() {
         const forceHide = isPanic && Math.random() < 0.5;
         if (!tag.revealed || forceHide) {
             hiddenCount++;
-            div.className = `tag-badge px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 bg-slate-900 border border-slate-700 shadow-sm mb-1 flex items-center gap-1.5 cursor-help`;
+            div.className = `tag-badge px-2 py-1 rounded-lg text-[10px] lg:text-xs font-bold text-slate-500 bg-slate-900 border border-slate-700 shadow-sm flex items-center gap-1 cursor-help`;
             div.innerHTML = isPanic ? `<span class="blur-sm">???</span>` : `<span>❓</span> 隐藏信息`;
         } else {
             if (tag.constraint) constraints.push(tag.constraint);
-            div.className = `tag-badge tag-reveal px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow-lg mb-1 flex items-center gap-1.5 border border-white/10 ${tag.color}`;
+            div.className = `tag-badge tag-reveal px-2 py-1 rounded-lg text-[10px] lg:text-xs font-bold text-white shadow-lg flex items-center gap-1 border border-white/10 ${tag.color}`;
             let icon = '⏺';
             if (tag.color.includes('red')) icon = '⚠️';
             else if (tag.constraint) icon = '🚫';
@@ -120,7 +136,7 @@ function renderPartner() {
         }
 
         btn.innerHTML = def.emoji + ' ' + def.name +
-            '<span class="block text-[9px] opacity-60 mt-0.5">收益 ' + rewardRange + ' | 压力 +' + stressRange + '</span>';
+            '<span class="block text-[8px] lg:text-[9px] opacity-60 mt-0.5">收益 ' + rewardRange + ' | 压力 +' + stressRange + '</span>';
     }
 
     // ---- 换一个按钮 ----
@@ -252,8 +268,14 @@ let _expandedPartnerIndex = -1;
 
 function renderHistoryList() {
     const list = document.getElementById('history-list');
+    if (!list) return;
     list.innerHTML = '';
     _expandedPartnerIndex = -1;
+
+    if (STATE.history.length === 0) {
+        list.innerHTML = '<div class="text-center text-slate-500 text-xs py-8">暂无约会记录</div>';
+        return;
+    }
 
     STATE.history.forEach((item, index) => {
         const div = document.createElement('div');
@@ -328,12 +350,7 @@ function togglePartnerDiseaseDetail(historyItem, index) {
     const diseaseNames = historyItem.diseases.map(d => DISEASES[d].name).join('、');
     const detailHTML = `
         <div id="partner-disease-detail" class="history-detail mt-1 bg-rose-950/30 border border-rose-500/30 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-3">
-                <h4 class="text-sm font-bold text-rose-300">🦠 该伴侣携带病原体：<span class="text-rose-200">${diseaseNames}</span></h4>
-                <button onclick="event.stopPropagation(); closePartnerDiseaseDetail();" class="text-slate-400 hover:text-white text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded-lg border border-white/10 transition-colors">
-                    ✕ 关闭
-                </button>
-            </div>
+            <h4 class="text-sm font-bold text-rose-300 mb-3">🦠 该伴侣携带病原体：<span class="text-rose-200">${diseaseNames}</span></h4>
             <div class="text-xs text-rose-100/80">${buildMultiDiseaseHTML(historyItem.diseases)}</div>
         </div>
     `;
@@ -483,27 +500,27 @@ function setFeedbackWide(wide) {
 // 按钮状态同步（手机端 + 桌面端）
 // ==========================================
 
-/** 同步桌面端按钮与手机端按钮的状态 */
-function syncDesktopButtons() {
-    const mobileBtns = {
-        next: document.getElementById('next-btn'),
-        restart: document.getElementById('restart-btn'),
-        history: document.getElementById('view-history-btn')
-    };
-    const deskBtns = {
-        next: document.getElementById('next-btn-desk'),
-        restart: document.getElementById('restart-btn-desk'),
-        history: document.getElementById('view-history-btn-desk')
-    };
+const END_BUTTONS = {
+    next:       { m: 'next-btn',           d: 'next-btn-desk' },
+    restart:    { m: 'restart-btn',        d: 'restart-btn-desk' },
+    history:    { m: 'view-history-btn',   d: 'view-history-btn-desk' },
+    returnHome: { m: 'return-home-btn',    d: 'return-home-btn-desk' }
+};
 
-    // 同步可见性
-    deskBtns.next.classList.toggle('hidden', mobileBtns.next.classList.contains('hidden'));
-    deskBtns.restart.classList.toggle('hidden', mobileBtns.restart.classList.contains('hidden'));
-    deskBtns.history.classList.toggle('hidden', mobileBtns.history.classList.contains('hidden'));
-
-    // 同步文字和点击事件
-    deskBtns.next.innerText = mobileBtns.next.innerText;
-    deskBtns.next.onclick = mobileBtns.next.onclick;
+/** 统一更新结算弹窗的按钮状态（手机端+桌面端同步生效） */
+function updateEndButtons(config) {
+    for (const [role, ids] of Object.entries(END_BUTTONS)) {
+        const cfg = config[role];
+        if (!cfg) continue;
+        const mobile = document.getElementById(ids.m);
+        const desk = document.getElementById(ids.d);
+        [mobile, desk].forEach(function(btn) {
+            if (!btn) return;
+            if (cfg.show !== undefined) btn.classList.toggle('hidden', !cfg.show);
+            if (cfg.text !== undefined) btn.innerText = cfg.text;
+            if (cfg.click !== undefined) btn.onclick = cfg.click;
+        });
+    }
 }
 
 // ==========================================
@@ -532,27 +549,21 @@ function showFeedback(title, msg, icon, isSimpleAlert = false, diseases = null) 
 
     toggleHistoryView(false);
 
-    const nextBtn = document.getElementById('next-btn');
-    const restartBtn = document.getElementById('restart-btn');
-    const historyBtn = document.getElementById('view-history-btn');
-
-    restartBtn.classList.add('hidden');
-    nextBtn.classList.remove('hidden');
-    historyBtn.classList.add('hidden');
-
     if (isSimpleAlert) {
-        nextBtn.innerText = "关闭";
-        nextBtn.onclick = function () {
-            el.classList.add('hidden');
-            nextBtn.onclick = nextTurn;
-            nextBtn.innerText = "继续";
-        };
+        updateEndButtons({
+            next:       { show: true, text: '关闭', click: function() { el.classList.add('hidden'); } },
+            restart:    { show: false },
+            history:    { show: false },
+            returnHome: { show: false }
+        });
     } else {
-        nextBtn.innerText = "继续";
-        nextBtn.onclick = nextTurn;
+        updateEndButtons({
+            next:       { show: true, text: '继续', click: nextTurn },
+            restart:    { show: false },
+            history:    { show: false },
+            returnHome: { show: false }
+        });
     }
-
-    syncDesktopButtons();
 }
 
 // ==========================================
@@ -583,11 +594,12 @@ function showGameOver(title, msg, icon, infectionKeys = null) {
     renderHistoryList();
     toggleHistoryView(false);
 
-    document.getElementById('next-btn').classList.add('hidden');
-    document.getElementById('restart-btn').classList.remove('hidden');
-    document.getElementById('view-history-btn').classList.remove('hidden');
-
-    syncDesktopButtons();
+    updateEndButtons({
+        next:       { show: false },
+        restart:    { show: true, text: '再来一局', click: restartGame },
+        history:    { show: true },
+        returnHome: { show: true }
+    });
 }
 
 // ==========================================
@@ -613,11 +625,12 @@ function showWin() {
     renderHistoryList();
     toggleHistoryView(false);
 
-    document.getElementById('next-btn').classList.add('hidden');
-    document.getElementById('restart-btn').classList.remove('hidden');
-    document.getElementById('view-history-btn').classList.remove('hidden');
-
-    syncDesktopButtons();
+    updateEndButtons({
+        next:       { show: false },
+        restart:    { show: true, text: '再来一局', click: restartGame },
+        history:    { show: true },
+        returnHome: { show: true }
+    });
 }
 
 // ==========================================
@@ -640,14 +653,14 @@ function buildMultiDiseaseHTML(diseaseKeys) {
     const uniqueId = 'multi-disease-' + Date.now();
     let html = '';
 
-    // ---- 疾病标签栏 ----
-    html += `<div class="flex flex-wrap gap-2 mb-4" id="${uniqueId}-tabs">`;
+    // ---- 疾病标签栏（手机横向滑动，桌面自动换行） ----
+    html += `<div class="flex gap-2 mb-4 overflow-x-auto custom-scroll pb-1 lg:flex-wrap lg:overflow-visible" id="${uniqueId}-tabs">`;
     diseaseKeys.forEach((dKey, idx) => {
         const d = DISEASES[dKey];
         const activeClass = idx === 0 ? 'bg-rose-600/40 border-rose-400 text-rose-200' : 'bg-slate-800/50 border-white/10 text-slate-400 hover:bg-slate-700/50';
         html += `
         <button onclick="switchDiseaseTab('${uniqueId}', '${dKey}', this)"
-                class="disease-tab px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${activeClass}"
+                class="disease-tab px-3 py-2 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${activeClass}"
                 data-dkey="${dKey}">
             🦠 ${d.name}
         </button>`;
@@ -666,14 +679,21 @@ function buildMultiDiseaseHTML(diseaseKeys) {
  * 切换疾病标签
  */
 function switchDiseaseTab(uniqueId, dKey, btn) {
-    // 更新标签样式
+    const ACTIVE = ['bg-rose-600/40', 'border-rose-400', 'text-rose-200'];
+    const INACTIVE = ['bg-slate-800/50', 'border-white/10', 'text-slate-400', 'hover:bg-slate-700/50'];
+
+    // 重置所有标签样式
     const tabs = document.getElementById(uniqueId + '-tabs');
     if (tabs) {
         tabs.querySelectorAll('.disease-tab').forEach(t => {
-            t.className = t.className.replace(/bg-rose-600\/40 border-rose-400 text-rose-200/g, 'bg-slate-800/50 border-white/10 text-slate-400 hover:bg-slate-700/50');
+            t.classList.remove(...ACTIVE);
+            t.classList.add(...INACTIVE);
         });
     }
-    btn.className = btn.className.replace(/bg-slate-800\/50 border-white\/10 text-slate-400 hover:bg-slate-700\/50/g, 'bg-rose-600/40 border-rose-400 text-rose-200');
+
+    // 激活当前标签
+    btn.classList.remove(...INACTIVE);
+    btn.classList.add(...ACTIVE);
 
     // 切换内容
     const container = document.getElementById(uniqueId + '-content');
@@ -802,7 +822,7 @@ function buildAccordion(title, id, contentFn) {
     const accordionId = `accordion-${id}`;
     return `
     <div class="edu-accordion" id="${accordionId}">
-        <div class="edu-accordion-header" onclick="toggleAccordion('${accordionId}')">
+        <div class="edu-accordion-header" onclick="toggleAccordion('${accordionId}', event)">
             <span class="text-sm font-bold text-slate-200">${title}</span>
             <span class="arrow">▼</span>
         </div>
@@ -815,7 +835,8 @@ function buildAccordion(title, id, contentFn) {
 }
 
 /** 切换折叠面板的展开/收起状态 */
-function toggleAccordion(id) {
+function toggleAccordion(id, event) {
+    if (event) event.stopPropagation();
     const el = document.getElementById(id);
     if (el) {
         el.classList.toggle('open');
